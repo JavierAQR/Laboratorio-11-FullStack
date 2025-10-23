@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Chat</title>
+  </head>
+  <body>
+    <h1>Chat</h1>
+
+    <div id="status"></div>
+
+    <div id="msgs" style="height:200px;overflow:auto;border:1px solid #ccc"></div>
+
+    <form id="form">
+      <input id="input" autocomplete="off" />
+      <button>Enviar</button>
+    </form>
+
+    <div id="typing"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const name = prompt('Ingresa tu nombre de usuario') || 'Anónimo';
+      const room = new URLSearchParams(location.search).get('room') || 'general';
+
+      const socket = io({ query: { name, room } });
+
+      const msgs = document.getElementById('msgs');
+      const typing = document.getElementById('typing');
+      const status = document.getElementById('status');
+      const form = document.getElementById('form');
+      const input = document.getElementById('input');
+
+      socket.on('connect', function () {
+        status.textContent = 'Conectado. Sala: ' + room;
+      });
+
+      socket.on('disconnect', function () {
+        status.textContent = 'Desconectado';
+      });
+
+      socket.on('system', function (txt) {
+        add('** ' + txt);
+      });
+
+      socket.on('chat message', function (m) {
+        add(m.from + ': ' + m.text);
+      });
+
+      socket.on('typing', function (d) {
+        typing.textContent = d.isTyping ? (d.from + ' está escribiendo...') : '';
+      });
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        socket.emit('chat message', text, function (ack) {
+          add(ack);
+        });
+
+        add('Yo: ' + text);
+        input.value = '';
+        socket.emit('typing', false);
+      });
+
+      let typingTimer;
+      input.addEventListener('input', function () {
+        clearTimeout(typingTimer);
+        socket.emit('typing', true);
+        typingTimer = setTimeout(function () {
+          socket.emit('typing', false);
+        }, 500);
+      });
+
+      function add(t) {
+        const p = document.createElement('p');
+        p.textContent = t;
+        msgs.appendChild(p);
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    </script>
+  </body>
+</html>
